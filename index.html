@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Floating Plastic Waste Separator & Flood Warning System</title>
+  <!-- Tailwind CSS -->
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <!-- Three.js & OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      user-select: none;
+      background-color: #030712;
+      color: #f8fafc;
+      width: 100vw;
+      height: 100vh;
+    }
+    #render-canvas {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(51, 65, 85, 0.8);
+      border-radius: 4px;
+    }
+    .glass-panel {
+      background: rgba(10, 18, 34, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    .pin-hotspot {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      z-index: 15;
+    }
+    .pin-hotspot:hover {
+      transform: translate(-50%, -50%) scale(1.15);
+    }
+    .pulse-pin {
+      animation: pinPulse 2s infinite;
+    }
+    @keyframes pinPulse {
+      0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.8); }
+      70% { box-shadow: 0 0 0 12px rgba(245, 158, 11, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 antialiased overflow-hidden select-none">
+
+  <!-- Main 3D Canvas -->
+  <canvas id="render-canvas"></canvas>
+
+  <!-- 3D HOTSPOT PINS OVERLAY CONTAINER -->
+  <div id="pins-container" class="absolute inset-0 pointer-events-none z-15">
+    <!-- Dynamic 3D pins rendered by JS -->
+  </div>
+
+  <!-- TOP HEADER & CONTROLS -->
+  <header class="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl glass-panel shadow-2xl border border-slate-700/60">
+    <div class="flex items-center gap-3">
+      <div class="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L5.6 15.11a2 2 0 00-1.295.127L2 16.32v3.68A2 2 0 004 22h16a2 2 0 002-2v-3.68l-2.572-2.892zM12 2v10m0 0l-3-3m3 3l3-3"></path>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-base sm:text-lg font-bold text-white tracking-wide leading-tight flex items-center gap-2">
+          <span>Smart Floating Plastic Separator</span>
+          <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono text-[10px] border border-indigo-500/30">Three.js PBR Engine</span>
+        </h1>
+        <p class="text-xs text-slate-400 flex items-center gap-2">
+          <span>Photorealistic 3D Simulation & Hardware Prototype</span>
+          <span id="status-dot" class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+          <span id="status-badge" class="text-emerald-400 font-bold uppercase">AUTONOMOUS PATROL</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="flex items-center gap-2 overflow-x-auto custom-scrollbar">
+      <button onclick="setCameraView('top')" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg transition flex items-center gap-1 border border-indigo-400/30">
+        <span>🚁 Top View</span>
+      </button>
+      <button onclick="triggerReturnToDock()" class="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg transition flex items-center gap-1">
+        <span>⚡ Dock & Recharge</span>
+      </button>
+      <button onclick="triggerHotspotMission()" class="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg transition flex items-center gap-1">
+        <span>▶ Scoop Plastic</span>
+      </button>
+      <button onclick="startGuidedTour()" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 shadow-lg transition flex items-center gap-1">
+        <span>📖 Guided Tour</span>
+      </button>
+      <button onclick="toggleTrashFlow()" id="btn-flow" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg transition flex items-center gap-1">
+        <span>⚡ Trash Path Flow</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- GUIDED EXPLANATION BANNER (Bottom Center) -->
+  <div id="explanation-banner" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20 w-11/12 max-w-3xl p-4 rounded-2xl glass-panel shadow-2xl border border-amber-500/40 flex flex-col gap-2">
+    <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+      <div class="flex items-center gap-2 font-bold text-amber-400 text-sm">
+        <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-xs" id="tour-step-tag">STEP 1 OF 5</span>
+        <span id="tour-step-title" class="text-white text-base">1. Buoyant Twin Pontoons & Stability</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="prevTourStep()" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold">⏮ Prev</button>
+        <button onclick="nextTourStep()" class="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold">Next Step ⏭</button>
+      </div>
+    </div>
+    <p id="tour-step-desc" class="text-xs sm:text-sm text-slate-200 leading-relaxed">
+      Dual bright-yellow HDPE pontoons keep the boat floating stably on rivers and canal drains without sinking. Rear IP68 underwater thrusters provide forward propulsion and steering.
+    </p>
+  </div>
+
+  <!-- LEFT CONTROL & COMPONENT GUIDE PANEL -->
+  <aside class="absolute top-20 left-3 z-10 w-80 max-h-[calc(100vh-10rem)] overflow-y-auto custom-scrollbar p-3.5 rounded-xl glass-panel shadow-xl flex flex-col gap-3.5 border border-slate-700/50">
+
+    <!-- Quick Simulation Controls -->
+    <div class="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 space-y-2">
+      <h3 class="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+        <span>⚡ Quick Docking Simulator</span>
+      </h3>
+      <div class="grid grid-cols-2 gap-1.5 text-xs">
+        <button onclick="simulateLowBattery()" class="p-2 rounded bg-amber-600/30 hover:bg-amber-600/50 text-amber-200 font-bold border border-amber-500/40 text-center">
+          🪫 Low Batt (15%)
+        </button>
+        <button onclick="simulateFullBin()" class="p-2 rounded bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-200 font-bold border border-cyan-500/40 text-center">
+          📦 Bin Full (100%)
+        </button>
+      </div>
+    </div>
+
+    <!-- Component Guide -->
+    <div class="p-3 rounded-lg bg-slate-900/90 border border-slate-800 space-y-2">
+      <h3 class="text-xs font-bold uppercase tracking-wider text-amber-400 mb-1 flex items-center justify-between">
+        <span>🔍 Interactive 3D Component Guide</span>
+        <span class="text-[10px] text-slate-400 font-normal">Click to Focus</span>
+      </h3>
+      <div class="space-y-1.5 text-xs text-slate-300">
+        <div onclick="focusPin('pontoons')" class="p-2 rounded bg-slate-950 border border-slate-800 cursor-pointer hover:border-amber-500 transition flex items-start gap-2">
+          <span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono text-[10px] font-bold">1</span>
+          <div>
+            <div class="font-bold text-amber-300">🚤 Twin HDPE Pontoons</div>
+            <div class="text-[11px] text-slate-400">High buoyancy yellow hulls keep boat floating stably in flowing canal water.</div>
+          </div>
+        </div>
+
+        <div onclick="focusPin('conveyor')" class="p-2 rounded bg-slate-950 border border-slate-800 cursor-pointer hover:border-emerald-500 transition flex items-start gap-2">
+          <span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono text-[10px] font-bold">2</span>
+          <div>
+            <div class="font-bold text-emerald-400">⚙️ Mesh Conveyor Belt Intake</div>
+            <div class="text-[11px] text-slate-400">Angled mesh belt rotates to scoop floating plastic bottles out of the river.</div>
+          </div>
+        </div>
+
+        <div onclick="focusPin('sorter')" class="p-2 rounded bg-slate-950 border border-slate-800 cursor-pointer hover:border-orange-500 transition flex items-start gap-2">
+          <span class="px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 font-mono text-[10px] font-bold">3</span>
+          <div>
+            <div class="font-bold text-orange-400">🦾 Servo Diverter Sorting Gate</div>
+            <div class="text-[11px] text-slate-400">Swings to drop plastic bottles into bin; knocks organic leaves back into canal.</div>
+          </div>
+        </div>
+
+        <div onclick="focusPin('esp32')" class="p-2 rounded bg-slate-950 border border-slate-800 cursor-pointer hover:border-cyan-500 transition flex items-start gap-2">
+          <span class="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 font-mono text-[10px] font-bold">4</span>
+          <div>
+            <div class="font-bold text-cyan-400">🧠 ESP32 Controller & Battery</div>
+            <div class="text-[11px] text-slate-400">IP67 waterproof box housing ESP32 AI brain & 12.8V LiFePO4 battery pack.</div>
+          </div>
+        </div>
+
+        <div onclick="focusPin('dock')" class="p-2 rounded bg-slate-950 border border-slate-800 cursor-pointer hover:border-amber-400 transition flex items-start gap-2">
+          <span class="px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 font-mono text-[10px] font-bold">5</span>
+          <div>
+            <div class="font-bold text-amber-300">⚡ Solar Charging Dock Station</div>
+            <div class="text-[11px] text-slate-400">Canal bank dock with magnetic charging contacts and automatic waste clearance.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exploded Cutaway View -->
+    <div class="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
+      <div class="flex items-center justify-between mb-1.5">
+        <label for="exploded-slider" class="text-xs font-bold uppercase text-amber-400">
+          Exploded View (See Inside)
+        </label>
+        <span id="exploded-val" class="text-xs font-mono font-bold text-slate-300">0%</span>
+      </div>
+      <input id="exploded-slider" type="range" min="0" max="100" value="0" step="1" oninput="updateExplodedView(this.value)" class="w-full accent-amber-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg">
+      <p class="text-[10px] text-slate-400 mt-1">
+        Slide to separate solar lid and pontoons so you can clearly see the ESP32 brain, wiring, and battery inside!
+      </p>
+    </div>
+
+    <!-- Camera View Presets -->
+    <div class="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
+      <h3 class="text-xs font-bold uppercase text-cyan-400 mb-2">Camera Focal Views</h3>
+      <div class="grid grid-cols-2 gap-1.5 text-xs">
+        <button onclick="setCameraView('top')" class="col-span-2 p-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-center font-bold flex items-center justify-center gap-1"><span>🚁 Top View (Overhead)</span></button>
+        <button onclick="setCameraView('chase')" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-center">Chase Cam</button>
+        <button onclick="setCameraView('intake')" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-center">Front Intake</button>
+        <button onclick="setCameraView('esp32')" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-center">Inside Chassis</button>
+        <button onclick="setCameraView('dock')" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-center">Dock Station</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- RIGHT TELEMETRY & AI VISION HUD -->
+  <aside class="absolute top-20 right-3 z-10 w-72 max-h-[calc(100vh-10rem)] overflow-y-auto custom-scrollbar p-3.5 rounded-xl glass-panel shadow-xl flex flex-col gap-3.5 border border-slate-700/50">
+
+    <!-- AI Vision Stream -->
+    <div class="p-3 rounded-lg bg-slate-900/90 border border-slate-800">
+      <div class="flex items-center justify-between mb-1.5">
+        <h3 class="text-xs font-bold uppercase text-emerald-400 flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          AI Camera Eye View
+        </h3>
+        <span class="text-[9px] font-mono px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-300">ESP32-CAM</span>
+      </div>
+
+      <div class="relative aspect-video rounded-lg overflow-hidden bg-slate-950 border border-slate-800">
+        <canvas id="ai-cam-canvas" class="w-full h-full object-cover"></canvas>
+        <div class="absolute top-1.5 left-1.5 px-1 py-0.5 rounded bg-black/70 text-[8px] font-mono text-emerald-400">
+          AI OBJECT DETECTOR
+        </div>
+        <div id="hud-fish-status" class="absolute bottom-1.5 right-1.5 px-1 py-0.5 rounded bg-black/70 text-[8px] font-mono text-amber-300">
+          FISH SAFE: ACTIVE
+        </div>
+      </div>
+
+      <div class="mt-2 space-y-0.5 text-[11px]">
+        <div class="flex justify-between items-center text-emerald-400 font-semibold">
+          <span>Plastic PET Bottle:</span>
+          <span id="ai-count-plastic" class="font-mono font-bold">0 Scooped</span>
+        </div>
+        <div class="flex justify-between items-center text-slate-400">
+          <span>Organic Leaf:</span>
+          <span>REJECT / DISCARD</span>
+        </div>
+        <div class="flex justify-between items-center text-amber-400 font-semibold">
+          <span>Swimming Fish:</span>
+          <span>SAFE SWERVE</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Telemetry -->
+    <div class="p-3 rounded-lg bg-slate-900/90 border border-slate-800 space-y-2">
+      <h3 class="text-xs font-bold uppercase text-slate-300 flex items-center justify-between">
+        <span>Live Telemetry</span>
+        <span id="dock-status-label" class="text-[10px] font-mono text-emerald-400">DISCHARGING</span>
+      </h3>
+
+      <div>
+        <div class="flex justify-between text-xs mb-1">
+          <span class="text-slate-400">LiFePO4 Battery:</span>
+          <span id="telemetry-battery" class="font-mono text-emerald-400 font-bold">88%</span>
+        </div>
+        <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+          <div id="battery-bar" class="bg-emerald-500 h-full transition-all" style="width: 88%"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex justify-between text-xs mb-1">
+          <span class="text-slate-400">12L Storage Bin:</span>
+          <span id="telemetry-bin" class="font-mono text-cyan-400 font-bold">0% Full</span>
+        </div>
+        <div class="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden border border-slate-800">
+          <div id="bin-bar" class="bg-cyan-500 h-full transition-all" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECONDARY FLOOD WARNING PANEL -->
+    <div class="p-3 rounded-lg bg-slate-900/90 border border-slate-800">
+      <h3 class="text-xs font-bold uppercase text-sky-400 mb-1.5 flex items-center gap-1">
+        <span>🌊 Flood Warning Subsystem</span>
+      </h3>
+      <div class="space-y-1 text-[11px]">
+        <div class="flex justify-between p-1 rounded bg-slate-950 border border-slate-800">
+          <span class="text-slate-400">Water Depth:</span>
+          <span class="font-mono font-bold text-sky-400">1.42 m</span>
+        </div>
+        <div class="flex justify-between p-1 rounded bg-slate-950 border border-slate-800">
+          <span class="text-slate-400">Rise Speed:</span>
+          <span class="font-mono text-emerald-400">+2.1 cm/h</span>
+        </div>
+        <div class="flex justify-between p-1 rounded bg-slate-950 border border-slate-800">
+          <span class="text-slate-400">Drainage Status:</span>
+          <span class="font-mono text-emerald-400">NORMAL FLOW</span>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- THREE.JS SCENE ENGINE & SIMULATION SCRIPT -->
+  <script>
+    let scene, camera, renderer, controls;
+    let vesselGroup, solarLidMesh, chassisLidMesh, pontoonLeftMesh, pontoonRightMesh;
+    let servoArmMesh, propellerLeftMesh, propellerRightMesh, waterMesh, trashFlowTubeMesh;
+    let chargingLaserMesh;
+
+    let vesselPos = { x: 0, z: 0 };
+    let vesselHeading = 0.0;
+    let vesselSpeed = 0.0;
+    let targetHeading = 0.0;
+    let vesselState = "PATROL";
+
+    let batteryLevel = 88;
+    let binLevel = 0;
+    let bottlesCollected = 0;
+    let explodedFactor = 0;
+    let showTrashFlowPath = true;
+
+    let cameraMode = "chase";
+    let targetCamPos = new THREE.Vector3(-150, 120, 260);
+    let targetCamLookAt = new THREE.Vector3(0, 0, 0);
+
+    let debrisMeshes = [];
+    let fishMesh, fishSafeRing;
+
+    // 3D Pins definitions mapped to Three.js world meshes
+    const PINS = [
+      { id: 'pontoons', key: '1', title: 'Twin HDPE Pontoons', localPos: new THREE.Vector3(-45, 0, 10), color: 'bg-amber-500 text-slate-950' },
+      { id: 'conveyor', key: '2', title: 'Front Conveyor Intake', localPos: new THREE.Vector3(0, 15, 65), color: 'bg-emerald-500 text-slate-950' },
+      { id: 'sorter', key: '3', title: 'Servo Diverter Gate', localPos: new THREE.Vector3(0, 32, 25), color: 'bg-orange-500 text-white' },
+      { id: 'esp32', key: '4', title: 'ESP32 AI & Battery', localPos: new THREE.Vector3(-10, 20, -5), color: 'bg-cyan-500 text-slate-950' },
+      { id: 'dock', key: '5', title: 'Solar Dock Station', worldPos: new THREE.Vector3(-320, 40, -80), color: 'bg-amber-400 text-slate-950', worldFixed: true }
+    ];
+
+    // Guided Tour Steps
+    let tourIndex = 0;
+    const TOUR_STEPS = [
+      {
+        tag: "STEP 1 OF 5",
+        title: "1. Buoyant Twin Pontoons & Stability",
+        desc: "Dual bright-yellow HDPE pontoons keep the boat floating stably on rivers and canal drains without sinking. Rear IP68 underwater thrusters provide forward propulsion and steering.",
+        preset: 'chase', state: 'PATROL', pin: 'pontoons'
+      },
+      {
+        tag: "STEP 2 OF 5",
+        title: "2. Front Conveyor Belt Scooping Plastic",
+        desc: "An inclined mesh conveyor belt rolls continuously. Floating plastic bottles and wrappers are scooped out of the water surface and carried upward.",
+        preset: 'intake', state: 'APPROACH_TRASH', pin: 'conveyor'
+      },
+      {
+        tag: "STEP 3 OF 5",
+        title: "3. Smart Servo Sorting Gate (Plastic vs Leaves)",
+        desc: "At the top of the conveyor, a servo-controlled diverter arm swings. Plastic bottles drop into the 12L storage bin, while organic leaves are knocked away back into the canal water.",
+        preset: 'intake', state: 'APPROACH_TRASH', pin: 'sorter'
+      },
+      {
+        tag: "STEP 4 OF 5",
+        title: "4. Inside Chassis: ESP32 AI Controller & Battery",
+        desc: "Slide the Exploded View to inspect inside! The green ESP32 board processes camera images and controls motors, powered by a 12.8V rechargeable battery pack.",
+        preset: 'esp32', state: 'PATROL', pin: 'esp32'
+      },
+      {
+        tag: "STEP 5 OF 5",
+        title: "5. Solar Docking Station & Automated Recharge",
+        desc: "When the waste bin is full or battery is low, the boat automatically steers to the bank dock, aligns magnetic charging contacts, recharges via solar panels, and clears collected waste.",
+        preset: 'dock', state: 'DOCKING', pin: 'dock'
+      }
+    ];
+
+    function initThree() {
+      const container = document.getElementById('render-canvas');
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x071126);
+      scene.fog = new THREE.FogExp2(0x071126, 0.0016);
+
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 2500);
+      camera.position.set(-160, 130, 270);
+
+      renderer = new THREE.WebGLRenderer({ canvas: container, antialias: true, alpha: false });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.15;
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxPolarAngle = Math.PI / 2 - 0.02;
+      controls.minDistance = 30;
+      controls.maxDistance = 900;
+
+      // Lights
+      const ambientLight = new THREE.AmbientLight(0xbae6fd, 0.7);
+      scene.add(ambientLight);
+
+      const hemiLight = new THREE.HemisphereLight(0x38bdf8, 0x0f172a, 0.65);
+      hemiLight.position.set(0, 300, 0);
+      scene.add(hemiLight);
+
+      const dirLight = new THREE.DirectionalLight(0xfff7ed, 1.5);
+      dirLight.position.set(200, 350, 150);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 2048;
+      dirLight.shadow.mapSize.height = 2048;
+      dirLight.shadow.camera.near = 10;
+      dirLight.shadow.camera.far = 1000;
+      dirLight.shadow.camera.left = -400;
+      dirLight.shadow.camera.right = 400;
+      dirLight.shadow.camera.top = 400;
+      dirLight.shadow.camera.bottom = -400;
+      dirLight.shadow.bias = -0.0005;
+      scene.add(dirLight);
+
+      // Build 3D World Geometry
+      buildWaterPlane();
+      buildDockStation();
+      buildVessel3D();
+      buildDebris3D();
+      buildTrashFlowTube();
+
+      window.addEventListener('resize', onWindowResize);
+      initAICamCanvas();
+      requestAnimationFrame(renderLoop);
+    }
+
+    function buildWaterPlane() {
+      const waterGeo = new THREE.PlaneGeometry(1800, 1800, 96, 96);
+      waterGeo.rotateX(-Math.PI / 2);
+
+      const waterMat = new THREE.MeshStandardMaterial({
+        color: 0x0c4a6e,
+        roughness: 0.1,
+        metalness: 0.3,
+        transparent: true,
+        opacity: 0.84
+      });
+
+      waterMesh = new THREE.Mesh(waterGeo, waterMat);
+      waterMesh.position.y = -10;
+      scene.add(waterMesh);
+    }
+
+    function buildVessel3D() {
+      vesselGroup = new THREE.Group();
+
+      // Pontoons (Yellow HDPE Plastic)
+      const pontoonMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.25, metalness: 0.1 });
+      const pontoonCapMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.3 });
+      const clampMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 });
+
+      // Left Pontoon
+      pontoonLeftMesh = new THREE.Group();
+      const pBodyLeft = new THREE.Mesh(new THREE.CylinderGeometry(11, 11, 130, 24), pontoonMat);
+      pBodyLeft.rotation.x = Math.PI / 2;
+      pBodyLeft.castShadow = true; pBodyLeft.receiveShadow = true;
+      pontoonLeftMesh.add(pBodyLeft);
+
+      const pNoseLeft = new THREE.Mesh(new THREE.ConeGeometry(11, 26, 24), pontoonCapMat);
+      pNoseLeft.rotation.x = -Math.PI / 2;
+      pNoseLeft.position.z = 78;
+      pNoseLeft.castShadow = true;
+      pontoonLeftMesh.add(pNoseLeft);
+
+      pontoonLeftMesh.position.set(-44, 0, 0);
+      vesselGroup.add(pontoonLeftMesh);
+
+      // Right Pontoon
+      pontoonRightMesh = pontoonLeftMesh.clone();
+      pontoonRightMesh.position.set(44, 0, 0);
+      vesselGroup.add(pontoonRightMesh);
+
+      // Aluminum Extrusion Crossbars
+      const aluminumMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.2, metalness: 0.85 });
+      const bar1 = new THREE.Mesh(new THREE.BoxGeometry(92, 5, 5), aluminumMat);
+      bar1.position.set(0, 10, 30); bar1.castShadow = true;
+      vesselGroup.add(bar1);
+
+      const bar2 = new THREE.Mesh(new THREE.BoxGeometry(92, 5, 5), aluminumMat);
+      bar2.position.set(0, 10, -30); bar2.castShadow = true;
+      vesselGroup.add(bar2);
+
+      // Waterproof IP67 Central Chassis Base
+      const chassisMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 });
+      const chassisBase = new THREE.Mesh(new THREE.BoxGeometry(68, 26, 76), chassisMat);
+      chassisBase.position.set(0, 18, 0); chassisBase.castShadow = true;
+      vesselGroup.add(chassisBase);
+
+      // IP67 Transparent Acrylic Lid
+      chassisLidMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(70, 12, 78),
+        new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.45, roughness: 0.1, transmission: 0.9, thickness: 1.5 })
+      );
+      chassisLidMesh.position.set(0, 37, 0);
+      vesselGroup.add(chassisLidMesh);
+
+      // ESP32 PCB Microcontroller (Inside Chassis)
+      const espPcb = new THREE.Mesh(new THREE.BoxGeometry(32, 4, 44), new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.3 }));
+      espPcb.position.set(-14, 25, 6);
+      vesselGroup.add(espPcb);
+
+      const espIc = new THREE.Mesh(new THREE.BoxGeometry(14, 3, 14), new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.2, metalness: 0.8 }));
+      espIc.position.set(-14, 28, 6);
+      vesselGroup.add(espIc);
+
+      // LiFePO4 Battery Pack (Inside Chassis)
+      const batPack = new THREE.Mesh(new THREE.BoxGeometry(26, 18, 30), new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.3 }));
+      batPack.position.set(16, 26, -5);
+      vesselGroup.add(batPack);
+
+      // Front Mesh Conveyor Intake (Angled Ramp)
+      const convGroup = new THREE.Group();
+      const convFrame = new THREE.Mesh(new THREE.BoxGeometry(38, 4, 86), aluminumMat);
+      convFrame.position.set(0, 12, 48);
+      convFrame.rotation.x = -Math.PI / 7;
+      convFrame.castShadow = true;
+      convGroup.add(convFrame);
+
+      const meshBelt = new THREE.Mesh(new THREE.BoxGeometry(34, 2, 84), new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 }));
+      meshBelt.position.set(0, 14, 48);
+      meshBelt.rotation.x = -Math.PI / 7;
+      convGroup.add(meshBelt);
+
+      vesselGroup.add(convGroup);
+
+      // 3D Servo Sorting Diverter Arm
+      const servoBody = new THREE.Mesh(new THREE.BoxGeometry(12, 16, 12), new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4 }));
+      servoBody.position.set(0, 36, 24);
+      vesselGroup.add(servoBody);
+
+      servoArmMesh = new THREE.Mesh(new THREE.BoxGeometry(4, 6, 32), new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.2 }));
+      servoArmMesh.position.set(0, 40, 24);
+      vesselGroup.add(servoArmMesh);
+
+      // Top Monocrystalline Solar Panel Lid
+      solarLidMesh = new THREE.Group();
+      const solarPlate = new THREE.Mesh(
+        new THREE.BoxGeometry(66, 3, 84),
+        new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.1, metalness: 0.4 })
+      );
+      solarPlate.castShadow = true;
+      solarLidMesh.add(solarPlate);
+
+      // ESP32-CAM Arch Module on Top Lid
+      const camArch = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 12, 16), new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.3 }));
+      camArch.position.set(0, 8, 38);
+      solarLidMesh.add(camArch);
+
+      solarLidMesh.position.set(0, 45, 0);
+      vesselGroup.add(solarLidMesh);
+
+      // Rear IP68 Underwater Thrusters
+      const thrusterMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.3 });
+      const propMat = new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.2 });
+
+      const tLeft = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 22, 16), thrusterMat);
+      tLeft.rotation.x = Math.PI / 2; tLeft.position.set(-34, -4, -62);
+      vesselGroup.add(tLeft);
+
+      propellerLeftMesh = new THREE.Mesh(new THREE.BoxGeometry(2, 14, 4), propMat);
+      propellerLeftMesh.position.set(-34, -4, -74);
+      vesselGroup.add(propellerLeftMesh);
+
+      const tRight = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 22, 16), thrusterMat);
+      tRight.rotation.x = Math.PI / 2; tRight.position.set(34, -4, -62);
+      vesselGroup.add(tRight);
+
+      propellerRightMesh = propellerLeftMesh.clone();
+      propellerRightMesh.position.set(34, -4, -74);
+      vesselGroup.add(propellerRightMesh);
+
+      scene.add(vesselGroup);
+    }
+
+    function buildDockStation() {
+      const dockGroup = new THREE.Group();
+
+      // Concrete/Wooden Shore Platform
+      const dockPlatform = new THREE.Mesh(
+        new THREE.BoxGeometry(130, 20, 160),
+        new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 })
+      );
+      dockPlatform.position.set(-320, -5, -80);
+      dockPlatform.receiveShadow = true; dockPlatform.castShadow = true;
+      dockGroup.add(dockPlatform);
+
+      // Solar Power Tower
+      const tower = new THREE.Mesh(
+        new THREE.CylinderGeometry(4, 5, 110, 16),
+        new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.3, metalness: 0.8 })
+      );
+      tower.position.set(-350, 60, -80); tower.castShadow = true;
+      dockGroup.add(tower);
+
+      const towerSolar = new THREE.Mesh(
+        new THREE.BoxGeometry(70, 4, 40),
+        new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.1, metalness: 0.4 })
+      );
+      towerSolar.rotation.z = -Math.PI / 8;
+      towerSolar.position.set(-350, 115, -80); towerSolar.castShadow = true;
+      dockGroup.add(towerSolar);
+
+      // Magnetic Contact Docking Arm
+      const arm = new THREE.Mesh(
+        new THREE.BoxGeometry(24, 16, 24),
+        new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.3 })
+      );
+      arm.position.set(-250, 10, -50); arm.castShadow = true;
+      dockGroup.add(arm);
+
+      // Charging Laser Beam Mesh
+      const laserGeo = new THREE.CylinderGeometry(1.5, 1.5, 80, 8);
+      laserGeo.rotateZ(Math.PI / 2);
+      chargingLaserMesh = new THREE.Mesh(
+        laserGeo,
+        new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0 })
+      );
+      chargingLaserMesh.position.set(-230, 20, -50);
+      dockGroup.add(chargingLaserMesh);
+
+      scene.add(dockGroup);
+    }
+
+    function buildDebris3D() {
+      debrisMeshes = [];
+
+      // 3D PET Bottles
+      const bottleGeo = new THREE.CylinderGeometry(4, 4, 14, 16);
+      const bottleMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.85, roughness: 0.1 });
+      const capMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3 });
+
+      const bottlePositions = [
+        { x: 190, z: 240 }, { x: 240, z: 270 }, { x: 150, z: 210 },
+        { x: 270, z: 190 }, { x: 100, z: 140 }
+      ];
+
+      bottlePositions.forEach((pos, idx) => {
+        const bGroup = new THREE.Group();
+        const bBody = new THREE.Mesh(bottleGeo, bottleMat);
+        bBody.castShadow = true;
+        bGroup.add(bBody);
+
+        const bCap = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 3, 12), capMat);
+        bCap.position.y = 8.5;
+        bGroup.add(bCap);
+
+        bGroup.position.set(pos.x, -5, pos.z);
+        scene.add(bGroup);
+        debrisMeshes.push({ mesh: bGroup, type: 'bottle', state: 'water', initX: pos.x, initZ: pos.z });
+      });
+
+      // Swimming Fish with Safe Zone Detection Ring
+      const fishGroup = new THREE.Group();
+      const fishBody = new THREE.Mesh(new THREE.ConeGeometry(5, 16, 12), new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.3 }));
+      fishBody.rotation.z = -Math.PI / 2;
+      fishGroup.add(fishBody);
+
+      fishSafeRing = new THREE.Mesh(
+        new THREE.RingGeometry(24, 26, 32),
+        new THREE.MeshBasicMaterial({ color: 0x22c55e, side: THREE.DoubleSide, transparent: true, opacity: 0.6 })
+      );
+      fishSafeRing.rotation.x = Math.PI / 2;
+      fishGroup.add(fishSafeRing);
+
+      fishGroup.position.set(90, -18, 130);
+      fishMesh = fishGroup;
+      scene.add(fishMesh);
+    }
+
+    function buildTrashFlowTube() {
+      const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0, -5, 120),
+        new THREE.Vector3(0, 10, 75),
+        new THREE.Vector3(0, 32, 24),
+        new THREE.Vector3(0, 22, -5)
+      ]);
+
+      const tubeGeo = new THREE.TubeGeometry(curve, 32, 2.5, 8, false);
+      const tubeMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.7 });
+      trashFlowTubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
+      vesselGroup.add(trashFlowTubeMesh);
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    let lastTime = 0;
+    function renderLoop(timestamp) {
+      const time = timestamp * 0.001;
+      const dt = Math.min(0.1, time - (lastTime || time));
+      lastTime = time;
+
+      updateSimulationPhysics(time, dt);
+      animateWaterMesh(time);
+      update3DPins();
+
+      controls.update();
+      renderer.render(scene, camera);
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    function animateWaterMesh(time) {
+      if (!waterMesh) return;
+      const pos = waterMesh.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const u = pos.getX(i);
+        const v = pos.getY(i);
+        const z = Math.sin(u * 0.015 + time * 2.2) * 2.2 + Math.cos(v * 0.015 + time * 1.8) * 2.2;
+        pos.setZ(i, z);
+      }
+      pos.needsUpdate = true;
+    }
+
+    function updateSimulationPhysics(time, dt) {
+      // Boat State Controller
+      if (vesselState === "PATROL") {
+        vesselSpeed = 50;
+        targetHeading = Math.sin(time * 0.35) * 0.6;
+        batteryLevel = Math.max(15, batteryLevel - dt * 1.2);
+
+        if (batteryLevel <= 20 || binLevel >= 100) {
+          triggerReturnToDock();
+        }
+
+      } else if (vesselState === "APPROACH_TRASH") {
+        vesselSpeed = 75;
+        batteryLevel = Math.max(15, batteryLevel - dt * 2.5);
+
+        const targetBottle = debrisMeshes.find(d => d.type === 'bottle' && d.state === 'water');
+        if (targetBottle) {
+          const dx = targetBottle.mesh.position.x - vesselPos.x;
+          const dz = targetBottle.mesh.position.z - vesselPos.z;
+          targetHeading = Math.atan2(dx, dz);
+
+          const dist = Math.hypot(dx, dz);
+          if (dist < 48) {
+            targetBottle.state = 'conveyor';
+            targetBottle.progress = 0;
+          }
+        } else {
+          vesselState = "PATROL";
+        }
+
+      } else if (vesselState === "DOCKING") {
+        vesselSpeed = 65;
+        const dockX = -270, dockZ = -80;
+        const dx = dockX - vesselPos.x;
+        const dz = dockZ - vesselPos.z;
+        targetHeading = Math.atan2(dx, dz);
+
+        const dist = Math.hypot(dx, dz);
+        if (dist < 40) {
+          vesselState = "DOCKED_CHARGING";
+          vesselSpeed = 0;
+        }
+
+      } else if (vesselState === "DOCKED_CHARGING") {
+        vesselSpeed = 0;
+        batteryLevel = Math.min(100, batteryLevel + dt * 28);
+        binLevel = Math.max(0, binLevel - dt * 50);
+
+        if (chargingLaserMesh) chargingLaserMesh.material.opacity = 0.85;
+
+        if (batteryLevel >= 99 && binLevel <= 1) {
+          vesselState = "PATROL";
+          if (chargingLaserMesh) chargingLaserMesh.material.opacity = 0;
+          document.getElementById('status-badge').textContent = "AUTONOMOUS PATROL";
+          document.getElementById('status-badge').className = "text-emerald-400 font-bold uppercase";
+
+          // Respawn floating bottles in water
+          debrisMeshes.forEach(d => {
+            d.state = 'water';
+            d.mesh.position.set(d.initX, -5, d.initZ);
+          });
+        }
+      }
+
+      // Smooth Heading & Movement
+      let diff = targetHeading - vesselHeading;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      vesselHeading += diff * dt * 3.2;
+
+      vesselPos.x += Math.sin(vesselHeading) * vesselSpeed * dt;
+      vesselPos.z += Math.cos(vesselHeading) * vesselSpeed * dt;
+
+      const bobY = Math.sin(time * 3.5) * 2.5;
+      vesselGroup.position.set(vesselPos.x, bobY, vesselPos.z);
+      vesselGroup.rotation.y = vesselHeading;
+
+      // Propeller Spinning
+      if (propellerLeftMesh) propellerLeftMesh.rotation.z += (vesselSpeed * 0.2 + 5) * dt;
+      if (propellerRightMesh) propellerRightMesh.rotation.z -= (vesselSpeed * 0.2 + 5) * dt;
+
+      // Servo Arm Oscillation
+      if (servoArmMesh) servoArmMesh.rotation.y = Math.sin(time * 4) * 0.45;
+
+      // Debris Motion along Conveyor
+      debrisMeshes.forEach(item => {
+        if (item.state === 'conveyor') {
+          item.progress += dt * 1.5;
+          item.mesh.position.x = vesselPos.x;
+          item.mesh.position.y = bobY + item.progress * 30;
+          item.mesh.position.z = vesselPos.z + (55 - item.progress * 35);
+          if (item.progress >= 1.0) {
+            item.state = 'bin';
+            bottlesCollected++;
+            binLevel = Math.min(100, binLevel + 25);
+            item.mesh.position.set(0, -999, 0); // Hide in bin
+          }
+        }
+      });
+
+      // Swimming Fish Motion
+      if (fishMesh) {
+        fishMesh.position.x = 90 + Math.sin(time * 1.6) * 70;
+        fishMesh.position.z = 130 + Math.cos(time * 1.3) * 40;
+        fishMesh.rotation.y = time * 1.6 + Math.PI / 2;
+      }
+
+      // Exploded View Mesh Offsets
+      const exp = explodedFactor;
+      if (solarLidMesh) solarLidMesh.position.y = 45 + exp * 75;
+      if (chassisLidMesh) chassisLidMesh.position.y = 37 + exp * 40;
+      if (pontoonLeftMesh) pontoonLeftMesh.position.x = -44 - exp * 50;
+      if (pontoonRightMesh) pontoonRightMesh.position.x = 44 + exp * 50;
+
+      // Trash Flow Path Toggle
+      if (trashFlowTubeMesh) trashFlowTubeMesh.visible = showTrashFlowPath;
+
+      // Smooth Camera Target Interpolation
+      controls.target.lerp(targetCamLookAt, 0.08);
+
+      updateUI();
+    }
+
+    function update3DPins() {
+      const container = document.getElementById('pins-container');
+      let html = '';
+
+      PINS.forEach(pin => {
+        let worldPos = new THREE.Vector3();
+        if (pin.worldFixed) {
+          worldPos.copy(pin.worldPos);
+        } else {
+          worldPos.copy(pin.localPos);
+          worldPos.applyEuler(vesselGroup.rotation);
+          worldPos.add(vesselGroup.position);
+        }
+
+        // Project 3D coordinate to 2D screen coordinate
+        const projected = worldPos.clone().project(camera);
+        const sx = (projected.x * 0.5 + 0.5) * window.innerWidth;
+        const sy = (-(projected.y * 0.5) + 0.5) * window.innerHeight;
+
+        if (projected.z < 1.0 && sx > 40 && sx < window.innerWidth - 40 && sy > 50 && sy < window.innerHeight - 50) {
+          html += `
+            <div onclick="focusPin('${pin.id}')" class="pin-hotspot pointer-events-auto flex items-center gap-1.5 px-2.5 py-1 rounded-full ${pin.color} font-bold text-xs shadow-2xl border border-white/40 pulse-pin" style="left: ${sx}px; top: ${sy}px;">
+              <span class="w-4 h-4 rounded-full bg-black/40 flex items-center justify-center font-mono text-[10px] text-white">${pin.key}</span>
+              <span class="hidden sm:inline">${pin.title}</span>
+            </div>
+          `;
+        }
+      });
+
+      container.innerHTML = html;
+    }
+
+    function initAICamCanvas() {
+      const aiCanvas = document.getElementById('ai-cam-canvas');
+      const aiCtx = aiCanvas.getContext('2d');
+      aiCanvas.width = 320; aiCanvas.height = 180;
+      let tick = 0;
+      function renderAICam() {
+        tick++;
+        aiCtx.fillStyle = '#020617'; aiCtx.fillRect(0, 0, 320, 180);
+        aiCtx.fillStyle = '#09253b'; aiCtx.fillRect(0, 45, 320, 135);
+
+        const bottleX = 135 + Math.sin(tick * 0.05) * 25;
+        aiCtx.strokeStyle = '#22c55e'; aiCtx.lineWidth = 2;
+        aiCtx.strokeRect(bottleX, 60, 60, 50);
+        aiCtx.fillStyle = '#22c55e'; aiCtx.font = '10px monospace';
+        aiCtx.fillText('PET BOTTLE: 98%', bottleX, 54);
+        aiCtx.fillText('[ACTION: ACCEPT & COLLECT]', bottleX, 124);
+
+        requestAnimationFrame(renderAICam);
+      }
+      renderAICam();
+    }
+
+    // INTERACTIVE CONTROLS & CAMERA PRESETS
+    function startGuidedTour() {
+      tourIndex = 0;
+      applyTourStep(0);
+    }
+    function prevTourStep() {
+      tourIndex = (tourIndex - 1 + TOUR_STEPS.length) % TOUR_STEPS.length;
+      applyTourStep(tourIndex);
+    }
+    function nextTourStep() {
+      tourIndex = (tourIndex + 1) % TOUR_STEPS.length;
+      applyTourStep(tourIndex);
+    }
+    function applyTourStep(idx) {
+      const step = TOUR_STEPS[idx];
+      document.getElementById('tour-step-tag').textContent = step.tag;
+      document.getElementById('tour-step-title').textContent = step.title;
+      document.getElementById('tour-step-desc').textContent = step.desc;
+
+      setCameraView(step.preset);
+      if (step.state === 'APPROACH_TRASH') triggerHotspotMission();
+      else if (step.state === 'DOCKING') triggerReturnToDock();
+    }
+
+    function focusPin(pinId) {
+      if (pinId === 'pontoons') { setCameraView('chase'); updateExplodedView(0); }
+      else if (pinId === 'conveyor') { setCameraView('intake'); updateExplodedView(0); }
+      else if (pinId === 'sorter') { setCameraView('intake'); updateExplodedView(20); }
+      else if (pinId === 'esp32') { setCameraView('esp32'); updateExplodedView(65); }
+      else if (pinId === 'dock') { setCameraView('dock'); updateExplodedView(0); }
+    }
+
+    function toggleTrashFlow() {
+      showTrashFlowPath = !showTrashFlowPath;
+      const btn = document.getElementById('btn-flow');
+      btn.className = showTrashFlowPath ? 
+        "px-3 py-1.5 text-xs font-bold rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg transition flex items-center gap-1" :
+        "px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 shadow-lg transition flex items-center gap-1";
+    }
+
+    function triggerHotspotMission() {
+      vesselState = "APPROACH_TRASH";
+      document.getElementById('status-badge').textContent = "NAVIGATING TO HOTSPOT";
+      document.getElementById('status-badge').className = "text-cyan-400 font-bold uppercase animate-pulse";
+      document.getElementById('status-dot').className = "inline-block w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping";
+    }
+    function triggerReturnToDock() {
+      vesselState = "DOCKING";
+      setCameraView('dock');
+      document.getElementById('status-badge').textContent = "RETURNING TO SOLAR DOCK";
+      document.getElementById('status-badge').className = "text-amber-400 font-bold uppercase animate-pulse";
+      document.getElementById('status-dot').className = "inline-block w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping";
+    }
+    function simulateLowBattery() {
+      batteryLevel = 15;
+      triggerReturnToDock();
+    }
+    function simulateFullBin() {
+      binLevel = 100;
+      triggerReturnToDock();
+    }
+
+    function setCameraView(preset) {
+      cameraMode = preset;
+      if (preset === 'top') {
+        targetCamPos.set(vesselPos.x, 380, vesselPos.z + 1);
+        targetCamLookAt.set(vesselPos.x, 0, vesselPos.z);
+      } else if (preset === 'chase') {
+        targetCamPos.set(vesselPos.x - 140, 110, vesselPos.z + 240);
+        targetCamLookAt.set(vesselPos.x, 15, vesselPos.z);
+      } else if (preset === 'intake') {
+        targetCamPos.set(vesselPos.x, 45, vesselPos.z + 160);
+        targetCamLookAt.set(vesselPos.x, 20, vesselPos.z + 30);
+      } else if (preset === 'esp32') {
+        targetCamPos.set(vesselPos.x, 90, vesselPos.z + 60);
+        targetCamLookAt.set(vesselPos.x, 25, vesselPos.z);
+        updateExplodedView(65);
+        document.getElementById('exploded-slider').value = 65;
+      } else if (preset === 'dock') {
+        targetCamPos.set(-180, 120, 90);
+        targetCamLookAt.set(-310, 30, -70);
+      }
+
+      camera.position.copy(targetCamPos);
+      controls.target.copy(targetCamLookAt);
+    }
+
+    function updateExplodedView(val) {
+      explodedFactor = parseFloat(val) / 100.0;
+      document.getElementById('exploded-val').textContent = `${val}%`;
+    }
+
+    function updateUI() {
+      document.getElementById('telemetry-bin').textContent = `${Math.round(binLevel)}% Full`;
+      document.getElementById('bin-bar').style.width = `${binLevel}%`;
+      document.getElementById('ai-count-plastic').textContent = `${bottlesCollected} Scooped`;
+      document.getElementById('telemetry-battery').textContent = `${Math.round(batteryLevel)}%`;
+      document.getElementById('battery-bar').style.width = `${batteryLevel}%`;
+
+      const statusLabel = document.getElementById('dock-status-label');
+      if (vesselState === "DOCKED_CHARGING") {
+        document.getElementById('status-badge').textContent = "⚡ CHARGING VIA SOLAR DOCK";
+        document.getElementById('status-badge').className = "text-amber-400 font-bold uppercase animate-pulse";
+        document.getElementById('status-dot').className = "inline-block w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping";
+        if (statusLabel) { statusLabel.textContent = "SOLAR CHARGING (+28%/s)"; statusLabel.className = "text-[10px] font-mono text-amber-400 font-bold animate-pulse"; }
+      } else if (vesselState === "DOCKING") {
+        if (statusLabel) { statusLabel.textContent = "STEERING TO DOCK"; statusLabel.className = "text-[10px] font-mono text-amber-300 font-bold"; }
+      } else {
+        if (statusLabel) { statusLabel.textContent = "BATTERY DISCHARGING"; statusLabel.className = "text-[10px] font-mono text-emerald-400"; }
+      }
+    }
+
+    window.addEventListener('load', initThree);
+  </script>
+</body>
+</html>
