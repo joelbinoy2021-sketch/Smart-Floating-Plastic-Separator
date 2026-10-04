@@ -1,0 +1,51 @@
+# Arduino build artifacts
+firmware/*.elf
+firmware/*.hex
+firmware/*.bin
+firmware/build/
+firmware/.cache/
+
+# Arduino IDE generated
+*.d
+*.o
+*.a
+*.map
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node (if you ever add a build step)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python (if scripts added)
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.env
+venv/
+env/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
